@@ -1,52 +1,54 @@
-var React = require('react');
-var Router = require('react-router');
-var Repos = require('./Github/Repos');
-var Notes = require('./Notes/Notes');
-var UserProfile = require('./Github/UserProfile');
-var ReactFireMixin = require('reactfire');
-var Firebase = require('firebase');
-var helpers = require('../utils/helpers');
+import React from 'react';
+import Repos from './Github/Repos';
+import Notes from './Notes/Notes';
+import UserProfile from './Github/UserProfile';
+import getGithubInfo from '../utils/helpers';
+import Rebase from 're-base';
 
-var Profile = React.createClass({
-  mixins: [ReactFireMixin],
-  getInitialState: function() {
-    return {
-      notes: [1, 2, 3],
+const base = Rebase.createClass('https://gg-react-notetaker.firebaseio.com/');
+
+class Profile extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      notes: [],
       bio: {},
       repos: []
     };
-  },
-  componentDidMount: function() {
+  }
+
+  componentDidMount() {
     this.ref = new Firebase('https://gg-react-notetaker.firebaseio.com/');
     this.init(this.props.params.username);
-  },
-  componentWillUnmount: function() {
-    this.unbind('notes');
-  },
-  componentWillReceiveProps: function(nextProps) {
-    this.unbind('notes');
+  }
+  componentWillUnmount() {
+    base.removeBinding(this.ref);
+  }
+  componentWillReceiveProps(nextProps) {
+    base.removeBinding(this.ref);
     this.init(nextProps.params.username);
-  },
-  init: function(username) {
-    var childRef = this.ref.child(username);
-    this.bindAsArray(childRef, 'notes');
+  }
+  init(username) {
+    this.ref = base.bindToState(this.props.params.username, {
+      context: this,
+      asArray: true,
+      state: 'notes'
+    });
 
-    helpers.getGithubInfo(username)
+    getGithubInfo(username)
       .then(function(data) {
         this.setState({
           bio: data.bio,
           repos: data.repos
-        })
+        });
       }.bind(this));
-  },
-  handleAddNote: function(newNote) {
-    console.log(this.ref.child(this.props.params.username)
-      .child(this.state.notes.length));
-    this.ref.child(this.props.params.username)
-      .child(this.state.notes.length)
-      .set(newNote);
-  },
-  render: function() {
+  }
+  handleAddNote(newNote) {
+    base.post(this.props.params.username, {
+      data: this.states.notes.concat([newNote])
+    });
+  }
+  render() {
     return (
       <div className="row">
         <div className="col-md-4">
@@ -57,12 +59,12 @@ var Profile = React.createClass({
         </div>
         <div className="col-md-4">
           <Notes username={this.props.params.username}
-                notes={this.state.notes}
-                addNote={this.handleAddNote} />
+                 notes={this.state.notes}
+                 addNote={(newNote)=> this.handleAddNote(newNote)} />
         </div>
       </div>
     );
   }
-});
+}
 
-module.exports = Profile;
+export default Profile;
